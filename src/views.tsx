@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { animate, AnimatePresence, motion, useMotionValue } from 'framer-motion'
 import { accounts, currentAccounts, groupTxs, money, txs, type Currency, type Tx } from './data'
-
-const art = (file: string) => `${import.meta.env.BASE_URL}art/${file}`
 import {
   IconArrow, IconBack, IconBag, IconBank, IconCalendar, IconCard, IconChart, IconChat, IconChev, IconRequest, IconUpDown,
   IconClose, IconCopy, IconDoc, IconDots, IconGift, IconHome, IconInfo, IconKeyboard, IconLoop,
   IconMail, IconMenu, IconMic, IconPig, IconPlus, IconQr, IconSearch, IconShare, IconSwap, IconTrash, IconUmbrella,
 } from './icons'
 import { useNav, type Tab } from './nav'
+
+const art = (file: string) => `${import.meta.env.BASE_URL}art/${file}`
 
 export function StatusBar() {
   const now = new Date()
@@ -288,6 +288,118 @@ export function RequestPay() {
   )
 }
 
+function AccountPager({ index, onIndex }: { index: number; onIndex: (next: number) => void }) {
+  const x = useMotionValue(0)
+  const ref = useRef<HTMLDivElement>(null)
+  const drag = useRef({ on: false, armed: false, x: 0, y: 0, id: -1 })
+  const account = currentAccounts[index] ?? currentAccounts[0]
+
+  function down(event: ReactPointerEvent<HTMLDivElement>) {
+    const state = drag.current
+    state.on = true
+    state.armed = false
+    state.x = event.clientX
+    state.y = event.clientY
+    state.id = event.pointerId
+  }
+
+  function move(event: ReactPointerEvent<HTMLDivElement>) {
+    const state = drag.current
+    if (!state.on || event.pointerId !== state.id) return
+    const dx = event.clientX - state.x
+    const dy = event.clientY - state.y
+    if (!state.armed) {
+      if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) {
+        state.on = false
+        return
+      }
+      if (Math.abs(dx) < 6) return
+      state.armed = true
+      event.currentTarget.setPointerCapture(event.pointerId)
+    }
+    const atStart = index === 0 && dx > 0
+    const atEnd = index === currentAccounts.length - 1 && dx < 0
+    x.set(atStart || atEnd ? dx * 0.35 : dx)
+  }
+
+  function up(event: ReactPointerEvent<HTMLDivElement>) {
+    const state = drag.current
+    if (!state.on || event.pointerId !== state.id) return
+    state.on = false
+    const dx = x.get()
+    const w = ref.current?.offsetWidth ?? 280
+    if (state.armed && dx < -50 && index < currentAccounts.length - 1) {
+      animate(x, -w, { duration: 0.16 }).then(() => {
+        onIndex(index + 1)
+        x.set(0)
+      })
+    } else if (state.armed && dx > 50 && index > 0) {
+      animate(x, w, { duration: 0.16 }).then(() => {
+        onIndex(index - 1)
+        x.set(0)
+      })
+    } else {
+      animate(x, 0, { type: 'spring', stiffness: 500, damping: 40 })
+    }
+  }
+
+  return (
+    <motion.div
+      ref={ref}
+      className="account-card"
+      style={{ x, touchAction: 'pan-y' }}
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={up}
+    >
+      <div className="top">
+        <span>{account.name} ☺</span>
+        <span>{money(account.balance, account.currency)}</span>
+      </div>
+      <div className="num">{account.number || 'Účet v USD'}</div>
+    </motion.div>
+  )
+}
+
+function SheetPane({ tall, onClose, children }: { tall: boolean; onClose: () => void; children: ReactNode }) {
+  const y = useMotionValue(0)
+  const drag = useRef({ on: false, y: 0, id: -1 })
+
+  function down(event: ReactPointerEvent<HTMLDivElement>) {
+    drag.current = { on: true, y: event.clientY, id: event.pointerId }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function move(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!drag.current.on || event.pointerId !== drag.current.id) return
+    y.set(Math.max(0, event.clientY - drag.current.y))
+  }
+
+  function up(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!drag.current.on || event.pointerId !== drag.current.id) return
+    drag.current.on = false
+    if (y.get() > 90) {
+      animate(y, 640, { duration: 0.2 }).then(onClose)
+    } else {
+      animate(y, 0, { type: 'spring', stiffness: 500, damping: 40 })
+    }
+  }
+
+  useEffect(() => {
+    y.set(window.innerHeight)
+    const controls = animate(y, 0, { type: 'spring', stiffness: 420, damping: 38 })
+    return () => controls.stop()
+  }, [y])
+
+  return (
+    <motion.div className={tall ? 'sheet aneta' : 'sheet'} style={{ y }}>
+      <div className="grab hit" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />
+      {children}
+    </motion.div>
+  )
+}
+
 export function Accounts({ index }: { index: number }) {
   const { push } = useNav()
   const [i, setI] = useState(index)
@@ -297,18 +409,7 @@ export function Accounts({ index }: { index: number }) {
   const groups = groupTxs(list)
   return (
     <Page title="Běžné účty" right={<button className="circle" onClick={() => push({ name: 'settings', kind: 'current' })}><IconDots size={18} /></button>}>
-      <motion.div drag="x" dragConstraints={{ left: 0, right: 0 }} onDragEnd={(_, info) => {
-        if (info.offset.x < -40) setI((n) => Math.min(currentAccounts.length - 1, n + 1))
-        if (info.offset.x > 40) setI((n) => Math.max(0, n - 1))
-      }}>
-        <div className="account-card">
-          <div className="top">
-            <span>{account.name} ☺</span>
-            <span>{money(account.balance, account.currency)}</span>
-          </div>
-          <div className="num">{account.number || 'Účet v USD'}</div>
-        </div>
-      </motion.div>
+      <AccountPager index={i} onIndex={setI} />
       <div className="dots">
         {currentAccounts.map((item, n) => <button key={item.id} className={n === i ? 'on' : ''} aria-label={item.name} onClick={() => setI(n)} />)}
       </div>
@@ -794,8 +895,7 @@ export function Sheets() {
       {sheet && (
         <>
           <motion.button className="sheet-back" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSheet(null)} />
-          <motion.div className={sheet === 'aneta' ? 'sheet aneta' : 'sheet'} initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', stiffness: 420, damping: 38 }}>
-            <div className="grab" />
+          <SheetPane tall={sheet === 'aneta'} onClose={() => setSheet(null)}>
             {sheet === 'funds' && (
               <>
                 <div className="section-h"><h2>Volné prostředky</h2><button onClick={() => setSheet(null)}><IconClose /></button></div>
@@ -815,7 +915,7 @@ export function Sheets() {
               </>
             )}
             {sheet === 'aneta' && <Aneta onClose={() => setSheet(null)} />}
-          </motion.div>
+          </SheetPane>
         </>
       )}
     </AnimatePresence>
