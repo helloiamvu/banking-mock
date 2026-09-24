@@ -19,7 +19,7 @@
   --safe-bottom: env(safe-area-inset-bottom);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
   color: var(--ink);
-  background: #111;
+  background: #f7f7f8;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -36,16 +36,15 @@ body {
   position: fixed;
   inset: 0;
   width: 100%;
-  height: 100dvh;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   background: #f7f7f8;
 }
 #root {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  height: 100dvh;
+  background: #f7f7f8;
 }
 
 .device {
