@@ -728,13 +728,15 @@ export function Done({ title, body, home }: { title: string; body: string; home?
 export function Rewards() {
   const { push } = useNav()
   return (
-    <div className="scroll plain">
+    <div className="shell">
       <header className="toprow"><h1>Odměny</h1></header>
+      <div className="scroll plain">
       <article className="card offer">
         <h3>Odměny za placení</h3>
         <p>Za platby kartou se tu sčítají odměny. V tomhle náhledu je účet čerstvě bez nových bodů.</p>
         <button className="btn" onClick={() => push({ name: 'done', title: 'Odměny', body: 'Za platby kartou tu zatím není nová odměna. Až nějaká přibyde, uvidíte ji v tomhle seznamu.' })}>Zatím 0 Kč</button>
       </article>
+      </div>
     </div>
   )
 }
@@ -743,14 +745,16 @@ export function Charts() {
   const { push } = useNav()
   const bars = [40, 70, 55, 90, 30, 64]
   return (
-    <div className="scroll plain">
+    <div className="shell">
       <header className="toprow"><h1>Grafy</h1></header>
+      <div className="scroll plain">
       <div className="card">
         <div className="chart">{bars.map((n) => <span key={n} style={{ height: n }} />)}</div>
       </div>
       <div className="card" style={{ marginTop: 12 }}>
         <button className="row" onClick={() => push({ name: 'accounts', index: 0 })}><span>Příjmy</span><span className="amt pos">320 000,00 CZK</span></button>
         <button className="row" onClick={() => push({ name: 'accounts', index: 0 })}><span>Výdaje</span><span className="amt">−393 099,00 CZK</span></button>
+      </div>
       </div>
     </div>
   )
@@ -766,8 +770,9 @@ export function MenuTab() {
     ['Aneta', () => setSheet('aneta')],
   ]
   return (
-    <div className="scroll plain">
+    <div className="shell">
       <header className="toprow"><h1>Menu</h1></header>
+      <div className="scroll plain">
       <div className="card glass" style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
         <span className="profile-dot" style={{ width: 44, height: 44 }} />
         <div><strong>Vu Hoang Anh</strong><div className="sub">Osobní účet</div></div>
@@ -776,6 +781,7 @@ export function MenuTab() {
         {items.map(([label, action]) => (
           <button key={label} className="row" onClick={action}><span className="grow">{label}</span><IconChev /></button>
         ))}
+      </div>
       </div>
     </div>
   )
