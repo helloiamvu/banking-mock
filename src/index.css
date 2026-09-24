@@ -94,6 +94,15 @@ body {
 .stage { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
 .stage.front { z-index: 12; background: #f6f6f7; touch-action: pan-y; }
 .stage.front.swipe { box-shadow: -16px 0 36px rgba(0, 0, 0, 0.16); }
+.edge {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  touch-action: none;
+}
 
 .scroll {
   flex: 1 1 auto;
@@ -477,7 +486,7 @@ body {
 
 .account-card {
   width: 100%;
-  touch-action: pan-y;
+  touch-action: none;
   border: 1.5px solid var(--green);
   border-radius: 16px;
   padding: 14px 14px 12px;

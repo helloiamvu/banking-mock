@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { animate, AnimatePresence, motion, useMotionValue } from 'framer-motion'
 import { accounts, currentAccounts, groupTxs, money, txs, type Currency, type Tx } from './data'
 import {
@@ -291,68 +291,61 @@ export function RequestPay() {
 function AccountPager({ index, onIndex }: { index: number; onIndex: (next: number) => void }) {
   const x = useMotionValue(0)
   const ref = useRef<HTMLDivElement>(null)
-  const drag = useRef({ on: false, armed: false, x: 0, y: 0, id: -1 })
+  const indexRef = useRef(index)
+  indexRef.current = index
   const account = currentAccounts[index] ?? currentAccounts[0]
 
-  function down(event: ReactPointerEvent<HTMLDivElement>) {
-    const state = drag.current
-    state.on = true
-    state.armed = false
-    state.x = event.clientX
-    state.y = event.clientY
-    state.id = event.pointerId
-  }
-
-  function move(event: ReactPointerEvent<HTMLDivElement>) {
-    const state = drag.current
-    if (!state.on || event.pointerId !== state.id) return
-    const dx = event.clientX - state.x
-    const dy = event.clientY - state.y
-    if (!state.armed) {
-      if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) {
-        state.on = false
-        return
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    let tracking = false
+    let startX = 0
+    let startY = 0
+    const start = (event: TouchEvent) => {
+      if (event.touches.length !== 1) return
+      startX = event.touches[0].clientX
+      startY = event.touches[0].clientY
+      tracking = false
+      x.set(0)
+    }
+    const move = (event: TouchEvent) => {
+      const touch = event.touches[0]
+      if (!touch) return
+      const dx = touch.clientX - startX
+      const dy = touch.clientY - startY
+      if (!tracking) {
+        if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) return
+        if (Math.abs(dx) < 4) return
+        tracking = true
       }
-      if (Math.abs(dx) < 6) return
-      state.armed = true
-      event.currentTarget.setPointerCapture(event.pointerId)
+      event.preventDefault()
+      const i = indexRef.current
+      const resist = (i === 0 && dx > 0) || (i === currentAccounts.length - 1 && dx < 0)
+      x.set(resist ? dx * 0.3 : dx)
     }
-    const atStart = index === 0 && dx > 0
-    const atEnd = index === currentAccounts.length - 1 && dx < 0
-    x.set(atStart || atEnd ? dx * 0.35 : dx)
-  }
-
-  function up(event: ReactPointerEvent<HTMLDivElement>) {
-    const state = drag.current
-    if (!state.on || event.pointerId !== state.id) return
-    state.on = false
-    const dx = x.get()
-    const w = ref.current?.offsetWidth ?? 280
-    if (state.armed && dx < -50 && index < currentAccounts.length - 1) {
-      animate(x, -w, { duration: 0.16 }).then(() => {
-        onIndex(index + 1)
-        x.set(0)
-      })
-    } else if (state.armed && dx > 50 && index > 0) {
-      animate(x, w, { duration: 0.16 }).then(() => {
-        onIndex(index - 1)
-        x.set(0)
-      })
-    } else {
-      animate(x, 0, { type: 'spring', stiffness: 500, damping: 40 })
+    const end = () => {
+      if (!tracking) return
+      tracking = false
+      const dx = x.get()
+      const i = indexRef.current
+      if (dx < -40 && i < currentAccounts.length - 1) onIndex(i + 1)
+      else if (dx > 40 && i > 0) onIndex(i - 1)
+      x.set(0)
     }
-  }
+    el.addEventListener('touchstart', start, { passive: true })
+    el.addEventListener('touchmove', move, { passive: false })
+    el.addEventListener('touchend', end)
+    el.addEventListener('touchcancel', end)
+    return () => {
+      el.removeEventListener('touchstart', start)
+      el.removeEventListener('touchmove', move)
+      el.removeEventListener('touchend', end)
+      el.removeEventListener('touchcancel', end)
+    }
+  }, [onIndex, x])
 
   return (
-    <motion.div
-      ref={ref}
-      className="account-card"
-      style={{ x, touchAction: 'pan-y' }}
-      onPointerDown={down}
-      onPointerMove={move}
-      onPointerUp={up}
-      onPointerCancel={up}
-    >
+    <motion.div ref={ref} className="account-card" style={{ x }}>
       <div className="top">
         <span>{account.name} ☺</span>
         <span>{money(account.balance, account.currency)}</span>
@@ -364,37 +357,57 @@ function AccountPager({ index, onIndex }: { index: number; onIndex: (next: numbe
 
 function SheetPane({ tall, onClose, children }: { tall: boolean; onClose: () => void; children: ReactNode }) {
   const y = useMotionValue(0)
-  const drag = useRef({ on: false, y: 0, id: -1 })
-
-  function down(event: ReactPointerEvent<HTMLDivElement>) {
-    drag.current = { on: true, y: event.clientY, id: event.pointerId }
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  function move(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!drag.current.on || event.pointerId !== drag.current.id) return
-    y.set(Math.max(0, event.clientY - drag.current.y))
-  }
-
-  function up(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!drag.current.on || event.pointerId !== drag.current.id) return
-    drag.current.on = false
-    if (y.get() > 90) {
-      animate(y, 640, { duration: 0.2 }).then(onClose)
-    } else {
-      animate(y, 0, { type: 'spring', stiffness: 500, damping: 40 })
-    }
-  }
+  const grab = useRef<HTMLDivElement>(null)
+  const playback = useRef<{ stop: () => void } | null>(null)
 
   useEffect(() => {
     y.set(window.innerHeight)
     const controls = animate(y, 0, { type: 'spring', stiffness: 420, damping: 38 })
+    playback.current = controls
     return () => controls.stop()
   }, [y])
 
+  useEffect(() => {
+    const el = grab.current
+    if (!el) return
+    let startY = 0
+    let origin = 0
+    const start = (event: TouchEvent) => {
+      if (event.touches.length !== 1) return
+      playback.current?.stop()
+      startY = event.touches[0].clientY
+      origin = y.get()
+    }
+    const move = (event: TouchEvent) => {
+      const touch = event.touches[0]
+      if (!touch) return
+      event.preventDefault()
+      y.set(Math.max(0, origin + touch.clientY - startY))
+    }
+    const end = () => {
+      if (y.get() > 90) {
+        const controls = animate(y, window.innerHeight, { duration: 0.16 })
+        playback.current = controls
+        controls.then(onClose)
+      } else {
+        playback.current = animate(y, 0, { type: 'spring', stiffness: 520, damping: 42 })
+      }
+    }
+    el.addEventListener('touchstart', start, { passive: true })
+    el.addEventListener('touchmove', move, { passive: false })
+    el.addEventListener('touchend', end)
+    el.addEventListener('touchcancel', end)
+    return () => {
+      el.removeEventListener('touchstart', start)
+      el.removeEventListener('touchmove', move)
+      el.removeEventListener('touchend', end)
+      el.removeEventListener('touchcancel', end)
+    }
+  }, [onClose, y])
+
   return (
     <motion.div className={tall ? 'sheet aneta' : 'sheet'} style={{ y }}>
-      <div className="grab hit" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />
+      <div className="grab hit" ref={grab} />
       {children}
     </motion.div>
   )

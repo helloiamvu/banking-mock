@@ -1,5 +1,5 @@
 import { animate, motion, useMotionValue } from 'framer-motion'
-import { useEffect, useRef, type PointerEvent, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { NavProvider, useNav, type Screen } from './nav'
 import {
   Accounts, Bonus, Cards, Charts, Done, Envelope, Home, Insurance, Interest, Invest, Limits,
@@ -37,7 +37,8 @@ function SwipeBack({ screenKey, children }: { screenKey: string; children: React
   const { pop } = useNav()
   const x = useMotionValue(0)
   const ref = useRef<HTMLDivElement>(null)
-  const drag = useRef({ on: false, armed: false, x: 0, y: 0, lastX: 0, lastT: 0, v: 0, id: -1 })
+  const edge = useRef<HTMLDivElement>(null)
+  const playback = useRef<{ stop: () => void } | null>(null)
   const depth = useRef(0)
 
   useEffect(() => {
@@ -45,84 +46,86 @@ function SwipeBack({ screenKey, children }: { screenKey: string; children: React
     const pushed = next > depth.current
     depth.current = next
     if (!pushed) {
+      playback.current?.stop()
       x.set(0)
       return
     }
     const w = ref.current?.offsetWidth ?? window.innerWidth
     x.set(w)
     const controls = animate(x, 0, { type: 'spring', stiffness: 380, damping: 42 })
+    playback.current = controls
     return () => controls.stop()
   }, [screenKey, x])
 
-  function width() {
-    return ref.current?.offsetWidth ?? window.innerWidth
-  }
+  useEffect(() => {
+    const el = edge.current
+    if (!el) return
+    let tracking = false
+    let origin = 0
+    let startX = 0
+    let startY = 0
+    let lastX = 0
+    let lastT = 0
+    let velocity = 0
 
-  function finish(popIt: boolean) {
-    const w = width()
-    if (popIt) {
-      animate(x, w, { type: 'tween', duration: 0.2, ease: [0.32, 0.72, 0, 1] }).then(pop)
-    } else {
-      animate(x, 0, { type: 'spring', stiffness: 500, damping: 42, mass: 0.7 })
+    const start = (event: TouchEvent) => {
+      if (event.touches.length !== 1) return
+      playback.current?.stop()
+      const touch = event.touches[0]
+      tracking = false
+      origin = x.get()
+      startX = touch.clientX
+      startY = touch.clientY
+      lastX = touch.clientX
+      lastT = performance.now()
+      velocity = 0
     }
-  }
-
-  function down(event: PointerEvent<HTMLDivElement>) {
-    if (event.clientX > 28) return
-    const state = drag.current
-    state.on = true
-    state.armed = false
-    state.x = event.clientX
-    state.y = event.clientY
-    state.lastX = event.clientX
-    state.lastT = performance.now()
-    state.v = 0
-    state.id = event.pointerId
-  }
-
-  function move(event: PointerEvent<HTMLDivElement>) {
-    const state = drag.current
-    if (!state.on || event.pointerId !== state.id) return
-    const dx = event.clientX - state.x
-    const dy = event.clientY - state.y
-    if (!state.armed) {
-      if (Math.abs(dy) > 14 && Math.abs(dy) > Math.abs(dx)) {
-        state.on = false
-        return
+    const move = (event: TouchEvent) => {
+      const touch = event.touches[0]
+      if (!touch) return
+      const dx = touch.clientX - startX
+      const dy = touch.clientY - startY
+      if (!tracking) {
+        if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) return
+        if (dx <= 0) return
+        tracking = true
       }
-      if (dx < 8) return
-      state.armed = true
-      event.currentTarget.setPointerCapture(event.pointerId)
+      event.preventDefault()
+      const now = performance.now()
+      const dt = now - lastT
+      if (dt > 0) velocity = (touch.clientX - lastX) / dt
+      lastX = touch.clientX
+      lastT = now
+      x.set(Math.max(0, origin + dx))
     }
-    const now = performance.now()
-    const dt = now - state.lastT
-    if (dt > 0) state.v = (event.clientX - state.lastX) / dt
-    state.lastX = event.clientX
-    state.lastT = now
-    x.set(Math.max(0, dx))
-  }
-
-  function up(event: PointerEvent<HTMLDivElement>) {
-    const state = drag.current
-    if (!state.on || event.pointerId !== state.id) return
-    state.on = false
-    if (!state.armed) return
-    const gone = x.get() > width() * 0.33 || state.v > 0.55
-    finish(gone)
-  }
+    const end = () => {
+      if (!tracking) return
+      tracking = false
+      const w = ref.current?.offsetWidth ?? window.innerWidth
+      if (x.get() > w * 0.28 || velocity > 0.4) {
+        const controls = animate(x, w, { duration: 0.16, ease: [0.2, 0.8, 0.2, 1] })
+        playback.current = controls
+        controls.then(pop)
+      } else {
+        playback.current = animate(x, 0, { type: 'spring', stiffness: 520, damping: 46 })
+      }
+    }
+    el.addEventListener('touchstart', start, { passive: true })
+    el.addEventListener('touchmove', move, { passive: false })
+    el.addEventListener('touchend', end)
+    el.addEventListener('touchcancel', end)
+    return () => {
+      el.removeEventListener('touchstart', start)
+      el.removeEventListener('touchmove', move)
+      el.removeEventListener('touchend', end)
+      el.removeEventListener('touchcancel', end)
+    }
+  }, [pop, x])
 
   return (
-    <motion.div
-      key={screenKey}
-      ref={ref}
-      className="stage front swipe"
-      style={{ x }}
-      onPointerDown={down}
-      onPointerMove={move}
-      onPointerUp={up}
-      onPointerCancel={up}
-    >
+    <motion.div key={screenKey} ref={ref} className="stage front swipe" style={{ x }}>
       {children}
+      <div className="edge" ref={edge} />
     </motion.div>
   )
 }
