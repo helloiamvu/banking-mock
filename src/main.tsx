@@ -4,12 +4,15 @@ import './index.css'
 import App from './App.tsx'
 
 function fitScreen() {
-  const viewport = window.visualViewport
-  const height = viewport?.height ?? window.innerHeight
-  const top = viewport?.offsetTop ?? 0
   const root = document.documentElement
+  if (window.matchMedia('(min-width: 700px)').matches) {
+    root.style.removeProperty('--app-h')
+    return
+  }
+  const viewport = window.visualViewport
+  const covered = (viewport?.offsetTop ?? 0) + (viewport?.height ?? 0)
+  const height = Math.max(window.innerHeight, covered)
   root.style.setProperty('--app-h', `${Math.round(height)}px`)
-  root.style.setProperty('--app-top', `${Math.round(top)}px`)
 }
 
 fitScreen()
