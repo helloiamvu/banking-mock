@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# The pages themselves send noindex. Crawlers must be allowed to fetch
+# them, otherwise Google never sees that tag and can still list the URL.
