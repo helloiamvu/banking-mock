@@ -154,10 +154,10 @@ body {
   padding: 4px 0 8px;
 }
 .home .toprow, .shell .toprow {
-  padding: max(59px, calc(12px + env(safe-area-inset-top, 0px))) 16px 8px;
+  padding: calc(4px + env(safe-area-inset-top, 0px)) 16px 8px;
 }
 .pagehead {
-  padding-top: max(59px, calc(12px + env(safe-area-inset-top, 0px)));
+  padding-top: calc(4px + env(safe-area-inset-top, 0px));
 }
 @media (max-width: 699px) {
   html, body, #root, .device {
@@ -462,7 +462,7 @@ body {
   flex: none;
   min-height: 52px;
   padding: 10px 12px;
-  padding-top: max(59px, calc(12px + env(safe-area-inset-top, 0px)));
+  padding-top: calc(4px + env(safe-area-inset-top, 0px));
   background: rgba(246, 246, 247, 0.94);
   backdrop-filter: blur(18px) saturate(1.5);
   -webkit-backdrop-filter: blur(18px) saturate(1.5);
