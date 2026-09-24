@@ -150,13 +150,16 @@ body {
   padding-top: max(59px, calc(12px + env(safe-area-inset-top, 0px)));
 }
 @media (max-width: 699px) {
-  html, body, #root {
-    top: 0;
-    height: var(--app-h, 100lvh);
-    min-height: 100lvh;
-    bottom: auto;
+  html, body, #root, .device {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
-  .device { top: 0; height: 100%; min-height: 100%; }
+  .tabbar { bottom: max(34px, env(safe-area-inset-bottom, 0px)); }
+  .fab { bottom: max(28px, calc(10px + env(safe-area-inset-bottom, 0px))); }
 }
 @media (min-width: 700px) {
   .home .toprow, .shell .toprow, .pagehead { padding-top: 58px; }
@@ -402,7 +405,7 @@ body {
   position: absolute;
   left: 12px;
   right: 12px;
-  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  bottom: max(34px, env(safe-area-inset-bottom, 0px));
   z-index: 25;
   height: 68px;
   border-radius: 34px;
@@ -577,7 +580,7 @@ body {
   position: absolute;
   left: 16px;
   right: 16px;
-  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  bottom: max(28px, calc(10px + env(safe-area-inset-bottom, 0px)));
   z-index: 15;
 }
 @media (min-width: 700px) { .fab { bottom: 22px; } }
