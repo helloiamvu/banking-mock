@@ -1,0 +1,52 @@
+:root {
+  --bg: #ffffff;
+  --fg: #0b0b0c;
+  --muted: #8a8a8e;
+  --accent: #0a84ff;
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root { height: 100%; }
+
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  background: #1c1c1e;
+}
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+/* Phone frame: fills the screen on mobile, shows a centered 393x852 device on desktop */
+.device {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+@media (min-width: 600px) {
+  body { display: grid; place-items: center; }
+  .device {
+    width: 393px;
+    height: 852px;
+    border-radius: 54px;
+    box-shadow: 0 0 0 12px #000, 0 30px 80px rgba(0,0,0,.5);
+    padding-top: 59px;
+    padding-bottom: 34px;
+  }
+}
+
+.screen { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
