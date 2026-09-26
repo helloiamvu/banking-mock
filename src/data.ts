@@ -32,9 +32,9 @@ export const accounts: Account[] = [
 export const currentAccounts = accounts.filter((a) => a.kind === 'current')
 
 export const txs: Tx[] = [
-  { id: 't2', accountId: 'osobni', title: 'Vu Hoang Anh', subtitle: 'Příchozí úhrada', amount: 150000, currency: 'CZK', when: 'Včera', group: 'Včera', letter: 'V', badge: 'in' },
-  { id: 't3', accountId: 'osobni', title: 'Vu Hoang Anh', subtitle: 'Příchozí úhrada', amount: 150000, currency: 'CZK', when: 'Včera', group: 'Včera', letter: 'V', badge: 'in' },
   { id: 't1', accountId: 'osobni', title: 'Spořicí účet', subtitle: 'Odchozí úhrada', amount: -300000, currency: 'CZK', when: 'Středa 23. 9.', group: 'Středa 23. 9.', letter: 'S', badge: 'out' },
+  { id: 't2', accountId: 'osobni', title: 'Vu Hoang Anh', subtitle: 'Příchozí úhrada', amount: 150000, currency: 'CZK', when: 'Středa 23. 9.', group: 'Středa 23. 9.', letter: 'V', badge: 'in' },
+  { id: 't3', accountId: 'osobni', title: 'Vu Hoang Anh', subtitle: 'Příchozí úhrada', amount: 150000, currency: 'CZK', when: 'Středa 23. 9.', group: 'Středa 23. 9.', letter: 'V', badge: 'in' },
   { id: 't4', accountId: 'osobni', title: 'GOPAY *IDNES', subtitle: 'Platba kartou', amount: -99, currency: 'CZK', when: 'Sobota 5. 9.', group: 'Sobota 5. 9.', letter: 'G', badge: 'card' },
   { id: 't5', accountId: 'osobni', title: 'Hoang Anh Vu', subtitle: 'Odchozí úhrada', amount: -20000, currency: 'CZK', when: 'Červenec', group: 'Červenec', letter: 'H', badge: 'out' },
   { id: 't6', accountId: 'osobni', title: 'Vu Hoang Anh', subtitle: 'Příchozí úhrada', amount: 20000, currency: 'CZK', when: 'Červenec', group: 'Červenec', letter: 'V', badge: 'in' },
