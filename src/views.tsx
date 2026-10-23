@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { animate, AnimatePresence, motion, useMotionValue } from 'framer-motion'
-import { accounts, currentAccounts, groupTxs, money, txs, type Currency, type Tx } from './data'
+import { accounts, currentAccounts, groupTxs, INTEREST_TAX, money, percent, RATE_ABOVE_CAP, RATE_UP_TO_CAP, savingsInterest, txs, weeklyApy, type Currency, type Tx } from './data'
 import {
   IconArrow, IconBack, IconBag, IconBank, IconCalendar, IconCard, IconChart, IconChat, IconChev, IconRequest, IconUpDown,
   IconClose, IconCopy, IconDoc, IconDots, IconGift, IconHome, IconInfo, IconKeyboard, IconLoop,
@@ -62,7 +62,7 @@ function Page({ title, children, right }: { title: string; children: ReactNode; 
 
 function Amt({ amount, currency }: { amount: number; currency: Currency }) {
   const text = money(Math.abs(amount), currency)
-  return <span className={amount > 0 ? 'amt pos' : 'amt'}>{amount < 0 ? '−' : ''}{text}</span>
+  return <span className={amount > 0 ? 'amt pos' : 'amt'}>{amount < 0 ? '-' : ''}{text}</span>
 }
 
 export function Home() {
@@ -71,9 +71,10 @@ export function Home() {
   const [hidden, setHidden] = useState(false)
   const [offer, setOffer] = useState(0)
   const [insight, setInsight] = useState(0)
+  const savings = accounts.find((account) => account.id === 'sporeni') ?? accounts[3]
   const insights = [
     <>Do 8. 10. zbývá <b>206,12 CZK</b></>,
-    <>Na spoření máte <b>300 000,00 CZK</b></>,
+    <>Na spoření máte <b>{money(savings.balance, 'CZK')}</b></>,
     <>Bonusová sazba <b>3,20 % p.a.</b></>,
   ]
   return (
@@ -114,7 +115,7 @@ export function Home() {
       </div>
       <div className="card">
         {currentAccounts.map((account) => (
-          <button key={account.id} className="row" onClick={() => push({ name: 'accounts', index: currentAccounts.indexOf(account) })}>
+          <button key={account.id} className="row" onClick={() => push({ name: 'accounts', accountId: account.id })}>
             <span className="green"><IconDoc size={26} /></span>
             <span className="name">{account.name}</span>
             <span className="amt">{hidden ? '••••' : money(account.balance, account.currency)}</span>
@@ -138,7 +139,7 @@ export function Home() {
         <button className="row" onClick={() => push({ name: 'savings' })}>
           <span className="green"><IconLoop size={26} /></span>
           <span className="name">Spořicí účet</span>
-          <span className="amt">{hidden ? '••••' : '300 000,00 CZK'}</span>
+          <span className="amt">{hidden ? '••••' : money(savings.balance, 'CZK')}</span>
         </button>
       </div>
 
@@ -413,67 +414,102 @@ function SheetPane({ tall, onClose, children }: { tall: boolean; onClose: () => 
   )
 }
 
-export function Accounts({ index }: { index: number }) {
+export function Accounts({ accountId }: { accountId: string }) {
   const { push } = useNav()
-  const [i, setI] = useState(index)
+  const opened = accounts.find((item) => item.id === accountId) ?? currentAccounts[0]
+  const paging = opened.kind === 'current'
+  const [i, setI] = useState(() => Math.max(0, currentAccounts.findIndex((item) => item.id === opened.id)))
   const [q, setQ] = useState('')
-  const account = currentAccounts[i] ?? currentAccounts[0]
+  const account = paging ? (currentAccounts[i] ?? currentAccounts[0]) : opened
   const list = useMemo(() => txs.filter((tx) => tx.accountId === account.id && `${tx.title} ${tx.subtitle}`.toLowerCase().includes(q.toLowerCase())), [account.id, q])
   const groups = groupTxs(list)
   return (
-    <Page title="Běžné účty" right={<button className="circle" onClick={() => push({ name: 'settings', kind: 'current' })}><IconDots size={18} /></button>}>
-      <AccountPager index={i} onIndex={setI} />
-      <div className="dots">
-        {currentAccounts.map((item, n) => <button key={item.id} className={n === i ? 'on' : ''} aria-label={item.name} onClick={() => setI(n)} />)}
-      </div>
-      <button className="banner" onClick={() => push({ name: 'templates' })}>Do 8. 10. nemáte žádné naplánované platby <span className="right">⚙</span></button>
-      <div className="section-h payhead">
-        <h2>Přehled plateb</h2>
-        <label className="search">Hledat <IconSearch size={16} /><input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Hledat" /></label>
-      </div>
+    <Page title={account.kind === 'savings' ? 'Přehled plateb' : 'Běžné účty'} right={<button className="circle" onClick={() => push({ name: 'settings', kind: account.kind })}><IconDots size={18} /></button>}>
+      {paging ? <AccountPager index={i} onIndex={setI} /> : (
+        <div className="account-card">
+          <div className="top"><span>{account.name}</span><span>{money(account.balance, account.currency)}</span></div>
+          <div className="num">{account.number}</div>
+        </div>
+      )}
+      {paging && (
+        <div className="dots">
+          {currentAccounts.map((item, n) => <button key={item.id} className={n === i ? 'on' : ''} aria-label={item.name} onClick={() => setI(n)} />)}
+        </div>
+      )}
+      {paging && <button className="banner" onClick={() => push({ name: 'templates' })}>Do 8. 10. nemáte žádné naplánované platby <span className="right">⚙</span></button>}
+      {paging && (
+        <div className="section-h payhead">
+          <h2>Přehled plateb</h2>
+          <label className="search">Hledat <IconSearch size={16} /><input value={q} onChange={(e) => setQ(e.target.value)} aria-label="Hledat" /></label>
+        </div>
+      )}
       {groups.map((group) => (
         <section key={group.label} className="tx-group">
           <div className="tx-head">
             <h3>{group.label}</h3>
-            {group.plus > 0 && group.minus < 0 && (
-              <div className="tx-sums">
-                <div className="pos">{money(group.plus, account.currency)}</div>
-                <div>{money(group.minus, account.currency)}</div>
+            {(group.plus > 0 || group.minus < 0) && (
+              <div className="tx-pills">
+                {group.plus > 0 && <span className="pos">{money(group.plus, account.currency)}</span>}
+                {group.minus < 0 && <span>{money(group.minus, account.currency)}</span>}
               </div>
             )}
           </div>
-          {group.items.map((tx, index) => (
-            <TxRow key={tx.id} tx={tx} showDate={tx.when !== tx.group && (index === 0 || group.items[index - 1].when !== tx.when)} />
+          {dateClusters(group.items).map((cluster) => (
+            <div key={cluster.when}>
+              {cluster.when !== group.label && <div className="date-line">{cluster.when}</div>}
+              <div className="tx-card">
+                {cluster.items.map((tx) => <TxRow key={tx.id} tx={tx} />)}
+              </div>
+            </div>
           ))}
         </section>
       ))}
       {list.length === 0 && <p className="muted" style={{ padding: 12 }}>Nic jsme nenašli.</p>}
       <div style={{ height: 70 }} />
-      <div className="fab"><button className="btn block" onClick={() => push({ name: 'pay' })}>→ Nová platba</button></div>
+      {account.kind === 'savings' ? (
+        <button className="fab-round" aria-label="Nová platba" onClick={() => push({ name: 'pay' })}><IconArrow size={26} /></button>
+      ) : (
+        <div className="fab"><button className="btn block" onClick={() => push({ name: 'pay' })}>→ Nová platba</button></div>
+      )}
     </Page>
   )
 }
 
-function TxRow({ tx, showDate }: { tx: Tx; showDate: boolean }) {
+function dateClusters(items: Tx[]) {
+  const clusters: { when: string; items: Tx[] }[] = []
+  for (const tx of items) {
+    const last = clusters[clusters.length - 1]
+    if (!last || last.when !== tx.when) clusters.push({ when: tx.when, items: [tx] })
+    else last.items.push(tx)
+  }
+  return clusters
+}
+
+function TxRow({ tx }: { tx: Tx }) {
   const { push } = useNav()
   return (
-    <>
-      {showDate && <div className="date-line">{tx.when}</div>}
-      <button className="tx" onClick={() => push({ name: 'done', title: tx.title, body: `${tx.subtitle} · ${tx.when}` })}>
-        <span className="avatar">{tx.letter}<i>{tx.badge === 'card' ? '▭' : tx.badge === 'in' ? '↓' : '↑'}</i></span>
-        <span className="copy">
-          <span className="name">{tx.title}</span>
-          <span className="sub">{tx.subtitle}</span>
-        </span>
+    <button className="tx" onClick={() => push({ name: 'done', title: tx.title, body: `${tx.detail ? `${tx.detail}. ` : ''}${tx.subtitle} · ${tx.when}` })}>
+      {tx.mark === 'bank' ? (
+        <span className="avatar bank" aria-hidden="true"><span className="logo">air<em>/</em>bank</span><i>?</i></span>
+      ) : (
+        <span className="avatar">{tx.letter}<i>?</i></span>
+      )}
+      <span className="copy">
+        <span className="name">{tx.title}</span>
+        <span className="sub">{tx.subtitle}</span>
+        {tx.detail && <span className="detail">{tx.detail}</span>}
+      </span>
+      <span className="tx-side">
         <Amt amount={tx.amount} currency={tx.currency} />
         <IconChev size={16} />
-      </button>
-    </>
+      </span>
+    </button>
   )
 }
 
 export function Savings() {
   const { push, setSheet } = useNav()
+  const savings = accounts.find((account) => account.id === 'sporeni') ?? accounts[3]
   return (
     <Page
       title="Spořicí účty"
@@ -485,15 +521,15 @@ export function Savings() {
       }
     >
       <div className="account-card">
-        <div className="top"><span>Spořicí účet ☺</span><span>300 000,00 CZK</span></div>
-        <div className="num">1124433048/3030</div>
+        <div className="top"><span>Spořicí účet ☺</span><span>{money(savings.balance, 'CZK')}</span></div>
+        <div className="num">{savings.number}</div>
       </div>
-      <button className="row card" style={{ marginTop: 12 }} onClick={() => push({ name: 'accounts', index: 0 })}>
+      <button className="row card" style={{ marginTop: 12 }} onClick={() => push({ name: 'accounts', accountId: 'sporeni' })}>
         <IconMenu size={18} /> Přehled plateb <IconChev className="right" />
       </button>
       <button className="row card" style={{ marginTop: 10 }} onClick={() => setSheet('funds')}>
         <span>Volné prostředky</span>
-        <span className="amt">300 000,00 CZK</span>
+        <span className="amt">{money(savings.balance, 'CZK')}</span>
       </button>
       <div className="promo">
         <p>Začněte investovat s Portu a sledujte, jak peníze pracují za vás. Snadno a už od 500 Kč. <button className="link" onClick={() => push({ name: 'invest' })}>Zjistit více</button></p>
@@ -541,7 +577,7 @@ export function Settings({ kind }: { kind: 'current' | 'savings' }) {
       <div className="actions" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         <button onClick={() => push({ name: 'limits' })}><span className="orb"><IconSwap size={20} /></span>Limity plateb</button>
         <button onClick={() => push({ name: 'statements' })}><span className="orb"><IconDoc size={20} /></span>Výpisy z účtu</button>
-        <button onClick={() => push({ name: 'accounts', index: 0 })}><span className="orb"><IconChart size={20} /></span>Příjmy a výdaje</button>
+        <button onClick={() => push({ name: 'accounts', accountId: kind === 'savings' ? 'sporeni' : 'osobni' })}><span className="orb"><IconChart size={20} /></span>Příjmy a výdaje</button>
       </div>
       <div className="card">
         {rows.map(([label, action]) => (
@@ -562,7 +598,7 @@ export function Bonus() {
     <Page title="Bonusová sazba">
       <h2 style={{ margin: '8px 0' }}>Tento měsíc</h2>
       <button className="row card" onClick={() => push({ name: 'interest' })}>
-        <span className="grow">Aktuální sazba<div className="sub">do 300 tis. CZK</div></span>
+        <span className="grow">Aktuální sazba<div className="sub">do 300 tis. CZK · hrubé APY {percent(weeklyApy(RATE_UP_TO_CAP))}</div></span>
         <span className="green"><b>✓ 3,20 % p.a.</b></span>
       </button>
       <div className="promo">
@@ -582,7 +618,7 @@ export function Interest() {
   return (
     <Page title="Jak úročení funguje">
       <p style={{ lineHeight: 1.45 }}>
-        Úročení funguje tak, že jeden měsíc splníte podmínky, druhý měsíc vám budeme úročit nejvyšší námi nabízenou sazbou a první den v následujícím měsíci vám úrok připíšeme.
+        Úročení funguje tak, že jeden měsíc splníte podmínky a další měsíc vám běží nejvyšší sazba. Úrok počítáme metodou ACT/365 a připisujeme ho každou středu. Sazba do 300 000 CZK je {percent(RATE_UP_TO_CAP)} p.a., hrubé APY {percent(weeklyApy(RATE_UP_TO_CAP))}. Nad tuto částku je {percent(RATE_ABOVE_CAP)} p.a., hrubé APY {percent(weeklyApy(RATE_ABOVE_CAP))}. Z úroku se strhává srážková daň {percent(INTEREST_TAX, 0)}, takže čisté APY pásma {percent(RATE_UP_TO_CAP)} je {percent(weeklyApy(RATE_UP_TO_CAP * (1 - INTEREST_TAX)))}. Od vkladu 23. 9. je hrubý úrok {money(savingsInterest.gross, 'CZK')}, daň {money(savingsInterest.tax, 'CZK')} a na účet přišlo {money(savingsInterest.net, 'CZK')}.
       </p>
       <h2 style={{ margin: '18px 0 8px' }}>Pravidelně spoříte</h2>
       <p style={{ lineHeight: 1.45 }}>
@@ -722,7 +758,7 @@ export function Pick({ mode }: { mode: 'from' | 'recipient' | 'request' }) {
   const { pop, setDraft } = useNav()
   const rows = mode === 'recipient'
     ? [
-        { id: 'sporeni', name: 'Spořicí účet', number: '1124433048/3030', balance: 300000, currency: 'CZK' as const },
+        { id: 'sporeni', name: 'Spořicí účet', number: '1124433048/3030', balance: accounts.find((account) => account.id === 'sporeni')?.balance ?? 0, currency: 'CZK' as const },
         { id: 'osobni', name: 'Vu Hoang Anh', number: '1124433013/3030', balance: 206.12, currency: 'CZK' as const },
       ]
     : mode === 'request'
@@ -866,8 +902,8 @@ export function Charts() {
         <div className="chart">{bars.map((n) => <span key={n} style={{ height: n }} />)}</div>
       </div>
       <div className="card" style={{ marginTop: 12 }}>
-        <button className="row" onClick={() => push({ name: 'accounts', index: 0 })}><span>Příjmy</span><span className="amt pos">320 000,00 CZK</span></button>
-        <button className="row" onClick={() => push({ name: 'accounts', index: 0 })}><span>Výdaje</span><span className="amt">−393 099,00 CZK</span></button>
+        <button className="row" onClick={() => push({ name: 'accounts', accountId: 'osobni' })}><span>Příjmy</span><span className="amt pos">320 000,00 CZK</span></button>
+        <button className="row" onClick={() => push({ name: 'accounts', accountId: 'osobni' })}><span>Výdaje</span><span className="amt">−393 099,00 CZK</span></button>
       </div>
       </div>
     </div>
@@ -912,7 +948,7 @@ export function Sheets() {
             {sheet === 'funds' && (
               <>
                 <div className="section-h"><h2>Volné prostředky</h2><button onClick={() => setSheet(null)}><IconClose /></button></div>
-                <div className="row"><span>Máte naspořeno</span><span className="amt">300 000,00 CZK</span></div>
+                <div className="row"><span>Máte naspořeno</span><span className="amt">{money(accounts.find((account) => account.id === 'sporeni')?.balance ?? 0, 'CZK')}</span></div>
                 <button className="menu-item" onClick={() => push({ name: 'pay' })}><IconSwap /> Převod peněz na účet <IconChev className="right" /></button>
                 <button className="menu-item" onClick={() => push({ name: 'roundup' })}><IconPig /> Přidat pravidelné spoření <IconChev className="right" /></button>
                 <button className="menu-item" onClick={() => push({ name: 'envelope' })}><IconMail /> Vytvořit novou obálku <IconChev className="right" /></button>

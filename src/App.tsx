@@ -12,7 +12,7 @@ function ScreenBody({ screen }: { screen: Screen }) {
   if (screen.name === 'request') return <RequestPay />
   if (screen.name === 'cards') return <Cards />
   if (screen.name === 'qr') return <QrScan />
-  if (screen.name === 'accounts') return <Accounts index={screen.index} />
+  if (screen.name === 'accounts') return <Accounts accountId={screen.accountId} />
   if (screen.name === 'savings') return <Savings />
   if (screen.name === 'settings') return <Settings kind={screen.kind} />
   if (screen.name === 'bonus') return <Bonus />

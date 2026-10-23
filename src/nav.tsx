@@ -7,7 +7,7 @@ export type Screen =
   | { name: 'request' }
   | { name: 'cards' }
   | { name: 'qr' }
-  | { name: 'accounts'; index: number }
+  | { name: 'accounts'; accountId: string }
   | { name: 'savings' }
   | { name: 'settings'; kind: 'current' | 'savings' }
   | { name: 'bonus' }
